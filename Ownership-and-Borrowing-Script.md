@@ -4,35 +4,123 @@ Hello and welcome to this Rust tutorial. We'll be focusing on
 Ownership and Borrowing, which are the core ideas that make Rust
 Rust. It lays the foundation for all the other tutorials out there.
 
-Your humble narrator today -- that is, me -- is named Nicholas
-Matsakis, though my friends call me Niko (and anyone who wants to
-learn Rust, clearly, qualifies as my friend). I'm a member of the core
-team and I've been working on Rust since around
-2011.
+My name is Nicholas Matsakis and I'll be your humble narrator
+today. I'm a member of the core team and I've been working on Rust
+since around 2011.
 
 # Slide 2
 
 So if you're here you're probably got some idea what Rust is all
 about, but let me just give you the elevator pitch. Rust is a language
-that makes it possible to get all the power that you've traditionally
-had with systems programming: tight control over your memory usage,
-ability to link easily into other programs, efficient execution, and
-so forth. Until now, if you wanted that sort of thing, you had to
-write in C and C++, but doing so comes at a cost. Here I'm talking
-those crashes that occur the first you run a new program -- and maybe
-the 2nd and 3rd time too -- or weird heisenbugs that go away when you
-add a debugging printf. But, most of all, this general fear that comes
-from the fact that even the most trivial mistake can have catastrophic
-consequences. Get an array index wrong and you have a potential
-security vulnerability on your hands.
+that aims to offer you comparable power and convenience to what you
+would find in a high-level language, like Python, Ruby, or Java, but
+with all the efficiency that you can wring out of a language like C or
+C++. If you're wondering how this is possible, that's exactly what
+this tutorial is all about. Ownership and borrowing are the core
+concepts that lets us pull together these two ends of the spectrum.
 
-Another important point is with Rust we are really aiming for a smooth
-experience for parallel programming. Part of that is great APIs that
-make it easy and convenient, and part of that is great safety
-guarantees, so that you adding parallelism doesn't mean you have to
-worry about strange bugs and unexpected behavior.
+So, this slogan is an accurate summary of what Rust offers, but
+frankly I find it a bit dry.  So let me offer you something
+a bit more *dramatic*.
 
 # Slide 3
+
+Ah yes, that's better! You're feeling it now, right? 
+
+click.
+
+Wait for it...
+
+click.
+
+There we go. "Hack without fear." This is a slogan coined by Felix
+Klock a few years back and I find it very apt. The idea is that Rust
+makes it easy to do awesome feats that, in the past, might have seemed
+too risky. Let me give you two example scenarios.
+
+Imagine you've got some Ruby code and it's running too slow. The usual
+solution to this is to rewrite your inner loop in C++ as a Ruby
+plugin, but that carries a lot of risk -- now even a small mistake,
+like an out of bounds array index, can carry catastrophic
+consequences, like a crash or a security vulnerability. But you can
+use Rust to write that plugin instead -- we offer a C ABI and we don't
+require a garbage collector or other runtime, so you can just plug
+Rust code right in where you would have used C. Now you get the
+performance boost you were looking for, but without the risk.
+
+Or perhaps you've got a bit of code dominated by some sequential loop
+and you're finding it's too slow. You'd like to use your multicore
+laptop to run those loop iterations in parallel. But you're afraid: it
+*seems* like that should be safe, but maybe you've forgotten about a
+shared counter or something that's going to lead to an occasional and
+hard to track down problem like a data-race. In Rust, you don't have
+to worry: the type system guarantees no data races, so you can add
+parallelism freely, secure in the knowledge that, if your code
+compiles, it is data-race free. This is something that even GC-based
+languages like Java can't offer.
+
+Interestingly, you may also find that you have more opportunities for
+parallelism in the first place. This is because the ownership and
+borrowing system that Rust uses encourages you to write well-factored
+code and avoid the deeply entangled object graphs that cause such
+trouble with threading -- and frankly which make code hard to
+understand even without threading.
+
+# Slide 4
+
+All right, that was a lot of abstract talking, so let try to make
+things a bit more concrete. I'm going to walk you very briefly through
+some code examples here. The idea is just to give you a feeling of
+what Rust has to offer; I'm not going to go into depth -- that will
+come later.
+
+This first example computes the dot-product of two vectors. In case
+you, like me, have done your best to forget everything you learned in
+High School, let me remind you that you compute a dot product by
+multiplying corresponding indices from each vector. So the 0th and the
+0th, 1th and the 1th, etc, and then summing up each of those products.
+
+This code is written using Rust's *iterators*. If you've done any
+Python coding, this will feel pretty familiar -- in fact, this code
+could almost *be* Python. We start out iterating over `vec1` and then
+`zip` that with `vec2`, which means we are now iterating over a series
+of pairs -- we can then map each of those pairs to multiply the two
+elements together. You see that `map` takes a closure, which is
+basically an anonymous function. We then sum the resulting numbers to
+get the final result.
+
+So, this *looks* like Python, but it doesn't *run* like Python. If
+you compile this example with full optimizations, what you get is some
+pretty tight assembly. 
+
+# Slide 5
+
+Here is what I got the last time I tried it -- in fact, what's
+happened is the compiler has even vectorized the loop, which means
+that it's using SIMD instructions to multiple several elements of the
+vector simultaneously!
+
+# Slide 6
+
+OK, that was cool, but let me show you something even cooler. Here
+I've added a declaration to the program that it would like to use the
+external library `rayon` -- in Rust speak, we call libraries "crates".
+Rayon is something that I wrote to allow for easy, drop-in
+parallelism. In particular, it allows me to simply change that call to
+`iter` into `par_iter` in order to enable parallel execution of this
+iterator chain. So now I get the same computation but executed **in
+parallel**.
+
+There are a couple of cool things here. First, note that Rayon is just
+a library -- it's not part of the core language. In fact, it wasn't
+even a particularly hard library to write: I think I wrote the first
+version of Rayon in about a weekend. And yet it is able to do these
+very powerful and fundamental extensions. Rust is very much a language
+that is designed to have a minimal core extended by powerful
+libraries.
+
+Second, Rayon isn't really your only choice for this sort of work. There
+are other options available.
 
 So what does it feel like to use Rust? Before I get into the tutorial
 proper, I want to skim through some example bits of Rust code. I don't
