@@ -8,180 +8,112 @@ My name is Nicholas Matsakis and I'll be your humble narrator
 today. I'm a member of the core team and I've been working on Rust
 since around 2011.
 
+But before we get started, I want to set the mood.
+
 # Slide 2
 
-So if you're here you're probably got some idea what Rust is all
-about, but let me just give you the elevator pitch. Rust is a language
-that aims to offer you comparable power and convenience to what you
-would find in a high-level language, like Python, Ruby, or Java, but
-with all the efficiency that you can wring out of a language like C or
-C++. If you're wondering how this is possible, that's exactly what
-this tutorial is all about. Ownership and borrowing are the core
-concepts that lets us pull together these two ends of the spectrum.
-
-So, this slogan is an accurate summary of what Rust offers, but
-frankly I find it a bit dry.  So let me offer you something
-a bit more *dramatic*.
-
-# Slide 3
-
-Ah yes, that's better! You're feeling it now, right? 
-
-click.
-
-Wait for it...
-
-click.
-
-There we go. "Hack without fear." This is a slogan coined by Felix
-Klock a few years back and I find it very apt. The idea is that Rust
-makes it easy to do awesome feats that, in the past, might have seemed
-too risky. Let me give you two example scenarios.
-
-Imagine you've got some Ruby code and it's running too slow. The usual
-solution to this is to rewrite your inner loop in C++ as a Ruby
-plugin, but that carries a lot of risk -- now even a small mistake,
-like an out of bounds array index, can carry catastrophic
-consequences, like a crash or a security vulnerability. But you can
-use Rust to write that plugin instead -- we offer a C ABI and we don't
-require a garbage collector or other runtime, so you can just plug
-Rust code right in where you would have used C. Now you get the
-performance boost you were looking for, but without the risk.
-
-Or perhaps you've got a bit of code dominated by some sequential loop
-and you're finding it's too slow. You'd like to use your multicore
-laptop to run those loop iterations in parallel. But you're afraid: it
-*seems* like that should be safe, but maybe you've forgotten about a
-shared counter or something that's going to lead to an occasional and
-hard to track down problem like a data-race. In Rust, you don't have
-to worry: the type system guarantees no data races, so you can add
-parallelism freely, secure in the knowledge that, if your code
-compiles, it is data-race free. This is something that even GC-based
-languages like Java can't offer.
-
-Interestingly, you may also find that you have more opportunities for
-parallelism in the first place. This is because the ownership and
-borrowing system that Rust uses encourages you to write well-factored
-code and avoid the deeply entangled object graphs that cause such
-trouble with threading -- and frankly which make code hard to
-understand even without threading.
+All right -- hopefully you've got a sense of adventure now.  If you're
+listening, you've probably got some idea what Rust is all about, but
+let me just give you the elevator pitch: "Hack without fear." This is
+a slogan coined by Felix Klock a few years back and I find it very
+apt. The idea is that Rust makes it easy to do awesome feats that, in
+the past, might have seemed too risky or too difficult to consider.
+Let me give you some examples to show you what I mean.
 
 # Slide 4
 
-All right, that was a lot of abstract talking, so let try to make
-things a bit more concrete. I'm going to walk you very briefly through
-some code examples here. The idea is just to give you a feeling of
-what Rust has to offer; I'm not going to go into depth -- that will
-come later.
-
-This first example computes the dot-product of two vectors. In case
-you, like me, have done your best to forget everything you learned in
-High School, let me remind you that you compute a dot product by
-multiplying corresponding indices from each vector. So the 0th and the
-0th, 1th and the 1th, etc, and then summing up each of those products.
-
-This code is written using Rust's *iterators*. If you've done any
-Python coding, this will feel pretty familiar -- in fact, this code
-could almost *be* Python. We start out iterating over `vec1` and then
-`zip` that with `vec2`, which means we are now iterating over a series
-of pairs -- we can then map each of those pairs to multiply the two
-elements together. You see that `map` takes a closure, which is
-basically an anonymous function. We then sum the resulting numbers to
-get the final result.
-
-So, this *looks* like Python, but it doesn't *run* like Python. If
-you compile this example with full optimizations, what you get is some
-pretty tight assembly. 
+Here you see some Ruby code. This is a Ruby method that checks whether
+a string is blank. It does so with a regular expression.  As you can
+see, it can process about 1 million iterations per second.  That might
+seem like enough, but at some point it was found that this function in
+fact shows up fairly high on the profiles for Ruby-on-Rails
+applications.
 
 # Slide 5
 
-Here is what I got the last time I tried it -- in fact, what's
-happened is the compiler has even vectorized the loop, which means
-that it's using SIMD instructions to multiple several elements of the
-vector simultaneously!
+In response, Sam Saffron decided to rewrite the function in C.  This
+is what it looks like. As you can see, it's a lot more complicated,
+but that pays off: we can now get about a 10-x performance
+improvement. So, if you use Ruby, you might want to try the
+`fast_blank` package.
+
+But writing C code like this is actually kind of a big investment.
+Not only is the code quite complex -- and note that it has a lot of
+special cases here to handle Unicode correctly -- but it's a big risk.
+After all, this is raw C pointer handling: if you make a mistake, you
+could go poking at arbitrary memory, which might have catastrophic
+consequences.
 
 # Slide 6
 
-OK, that was cool, but let me show you something even cooler. Here
-I've added a declaration to the program that it would like to use the
-external library `rayon` -- in Rust speak, we call libraries "crates".
-Rayon is something that I wrote to allow for easy, drop-in
-parallelism. In particular, it allows me to simply change that call to
-`iter` into `par_iter` in order to enable parallel execution of this
-iterator chain. So now I get the same computation but executed **in
-parallel**.
+So maybe you wouldn't thing it's worth it to try to micro-optimize
+code like that. But what if we tried to use Rust instead? This is what
+the Rust code looks like. You can see it's a lot more high-level than
+the C code was. It starts out by getting a "string slice" from the raw
+Ruby data and then getting an iterator that will look at each unicode
+character, one by one. Next it calls this function `all`, giving it a
+closure that will test whether all the characters are whitespace.
 
-There are a couple of cool things here. First, note that Rayon is just
-a library -- it's not part of the core language. In fact, it wasn't
-even a particularly hard library to write: I think I wrote the first
-version of Rayon in about a weekend. And yet it is able to do these
-very powerful and fundamental extensions. Rust is very much a language
-that is designed to have a minimal core extended by powerful
-libraries.
-
-Second, Rayon isn't really your only choice for this sort of work. There
-are other options available.
-
-So what does it feel like to use Rust? Before I get into the tutorial
-proper, I want to skim through some example bits of Rust code. I don't
-expect you to understand the syntax yet if you haven't done any Rust
-programming before.
-
-Here is a function called `sum_pos` that iterates over an array
-of integers. It will filter that array to select just the positive
-integers and sum them up. What I want to point out is that we are able
-to use these pretty high-level concepts, like iterator chains and closures,
-which you would normally get from high-level languages like Ruby or Python,
-but you get assembly code like this.
-
-# Slide 4
-
-This is that same function compiled and optimized, and you can see that it's
-very tight.
-
-# Slide 5
-
-In fact, even that version of the function was kind of low-level from
-my point-of-view. I'd probably write it more like this, which uses an
-iterator chain. What we try to shoot for in Rust is that high-level
-abstractions generate code which is as good -- or even better than! --
-the low-level code you would get if you wrote things by hand. In the case
-of iterators, for example, we can do better than a while loop iterating over
-an array, since we can elide bounds checks.
-
-# Slide 6
-
-This brings us to safety. The key selling point of Rust is that you
-get not only low-level control but high-level safety. So here is an
-example of a function iterating over a vector and pushing onto it.
-This is generally suspicious, even in a GC'd language, but in C++ it's
-particularly dangerous. The problem is that you can get what's called
-*iterator invalidation*, where you wind up freeing the underlying
-buffer as you're iterating.
-
-But if you try to write this in Rust, this just won't compile. The
-message below is basically saying "you can't mutate a vector while
-you're iterating over it". In this tutorial we'll see the Rust type
-system rules that lead to this error and come to understand them at a
-deeper level.
+So you might think that since this code is so much prettier, it has to
+be slower, right? Wrong. In fact, it runs ever so slightly faster than
+the corresponding C code, clocking in at 11 million iterations per
+second.  Even better, since this is Rust, we know that if we made a
+mistake somewhere, it won't trigger a security vulnerability.
 
 # Slide 7
 
-I mentioned parallel programming. This is an example of simple parallel
-programming in Rust. I should add it's using one my libraries, rayon,
-and there are other libraries you might use. What it does -- well, it does
-what quicksort does. It partitions into two halves and uses helper rayon::join,
-which will run in parallel if there are enough resources. Very easy,
-just addone function call.
+All right, let's look at one more example. You may have heard that
+parallel programming is very hard to get right. Rust aims to change
+that, both by APIs that make it easy to write simple parallel loops,
+and by a type system that can prevent common mistakes.
+
+Let's start with some sequential code. Here is an iterator that
+iterates ove a list of paths and loads an image for each one. It then
+creates and returns a vector of these images.
+
+Now, loading images is totally independent, so it'd be nice if we could
+do this in parallel.
 
 # Slide 8
 
-What's even better is, if I make a mistake, say I accidentally recurse
-and process the same data in both threads, I will get a compilation
-error. This protection also falls out from the rules we'll be covering
-today.
+Here I've added a declaration to the program that it would like to use
+the external library `rayon` -- in Rust speak, we call libraries
+"crates". Rayon is something that I wrote to allow for easy, drop-in
+parallelism. In particular, it allows me to simply change that call to
+`iter` into `par_iter` in order to enable parallel execution.
+
+There are a couple of cool things here. First, note that Rayon is just
+a library -- it's not part of the core language. And yet it is able to
+do these very powerful and fundamental extensions. Rust is designed to
+have a minimal core extended by powerful libraries.
+
+For parallelism in particular, we worked hard to ensure that the core
+Rust language can support a wide range of parallel programming
+paradigms. This is because parallelism isn't really a "one-size fits
+all" affair. So Rust offers support for parallel iterators, as shown
+here, but also tasks and channels, rather like Go, shared data with
+mutexes, and a number of other things.
 
 # Slide 9
+
+But making parallelism accessible is about more than slick-looking
+APIs. You can find this in many languages. What makes Rust different
+is that the type system helps to find and detect subtle bugs before
+they make your code go haywire.
+
+To see what I mean, imagine that we tried to add some code to this
+image loader to count up the jpegs. We might do it like this. The
+problem is that this code would be wrong: adding numbers without any
+synchronization like this is actually a data race. In fact, this code
+probably represents one of the worst kinds of data race, because it
+likely won't fail in any obvious way, you'll just have a count that is
+sometimes wrong. But probably not when you're running your tests.
+
+So what happens in Rust? The answer is that this code won't compile.
+You can fix this either by moving the count out of the parallel loop,
+or by using some kind of shared counter that is safe across threads.
+
+# Slide 10
 
 Now, a language is about more than just its syntax. Part of being a
 modern language these days is making it trivial to incorporate
@@ -190,7 +122,7 @@ called `crates.io`, and also a powerful build tool called `cargo` that
 can automatically download and build all of your dependencies for you.
 `cargo` basically replaces `make` as the build tool of choice.
 
-# Slide 10
+# Slide 11
 
 Something else we have tried very hard to do with Rust is to build an
 open and welcoming community. We have an open governance model where
@@ -199,14 +131,14 @@ forums and so forth where you can go to ask for help or raise
 questions. And of course the project is all open source, so you can
 also take part in the development and leadership of Rust itself.
 
-# Slide 11
+# Slide 12
 
 All right, so let's get started! I'm going to start out with Hello
 World and we'll see that just from this simple example we can branch
 off into a lot of interesting questions about how Rust handles
 memory management, safety, and so forth.
 
-# Slide 12
+# Slide 13
 
 Here is "Hello, World" in Rust. Now, rather than talk about this
 program here on the slide, I want to take you over to this website.
@@ -367,7 +299,7 @@ little more complicated. This is kind of The Key Thing about
 understanding Rust: *ownership and borrowing*. So let's go back to the
 slides now.
 
-# Slide 13
+# Slide 14
 
 
 
